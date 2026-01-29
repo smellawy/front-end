@@ -3,17 +3,26 @@ pipeline {
   tools {
     nodejs 'NodeJS 25.5.0'
   }
-  
-  environment {
-    LD_LIBRARY_PATH = '/usr/lib64:/usr/lib:${LD_LIBRARY_PATH}'
-  }
 
   stages {
+    stage('Setup') {
+      steps {
+        sh '''
+          # تثبيت libatomic داخل الحاوية
+          apt-get update && apt-get install -y libatomic1
+          
+          # أو إذا كان النظام RedHat-based داخل الحاوية
+          # microdnf install -y libatomic
+          # أو
+          # yum install -y libatomic
+        '''
+      }
+    }
+
     stage('Build') {
       steps {
         echo 'this is the first job'
         sh '''
-          echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
           node --version
           npm install
         '''
