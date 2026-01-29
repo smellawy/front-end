@@ -1,20 +1,18 @@
 pipeline {
-  agent any
-  tools {
-    nodejs 'NodeJS 25.5.0'
+  agent {
+    docker {
+      image 'node:25.5.0-bullseye'  # أو صورة تحتوي على libatomic
+      args '--privileged'
+    }
   }
-
+  
   stages {
     stage('Setup') {
       steps {
         sh '''
-          # تثبيت libatomic داخل الحاوية
+          # تثبيت المكتبات المطلوبة
           apt-get update && apt-get install -y libatomic1
-          
-          # أو إذا كان النظام RedHat-based داخل الحاوية
-          # microdnf install -y libatomic
-          # أو
-          # yum install -y libatomic
+          node --version
         '''
       }
     }
@@ -22,10 +20,7 @@ pipeline {
     stage('Build') {
       steps {
         echo 'this is the first job'
-        sh '''
-          node --version
-          npm install
-        '''
+        sh 'npm install'
       }
     }
 
