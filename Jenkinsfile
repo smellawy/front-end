@@ -1,31 +1,33 @@
-pipeline{
+pipeline {
 
     agent any
 
-    stages{
-        stage('build'){
-            steps{
+    stages {
+        stage('Build') {
+            steps {
                 echo 'this is the first job'
                 sh 'npm install'
             }
         }
-        stage('test'){
-            steps{
+
+        stage('Test') {
+            steps {
                 echo 'this is the second job'
                 sh 'npm test'
             }
         }
-        stage('package'){
-            steps{
+
+        stage('Package') {
+            steps {
                 echo 'this is the third job'
                 sh 'npm run package'
             }
         }
     }
-    
-    post{
-        always{
+
+    post {
+        always {
             echo 'this pipeline has completed...'
         }
-        
     }
+}
