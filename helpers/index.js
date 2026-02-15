@@ -1,68 +1,80 @@
-(function () {
+(function (){
   'use strict';
-  const axios = require("axios");
-  const helpers = {};
 
-  // Error-handling middleware → MUST have 4 parameters
-  helpers.errorHandler = function (err, req, res, next) {
-    console.error(err.stack); // good for logs
+  var axios = require("axios");
+  var helpers = {};
 
-    const status = err.status || 500;
-    const response = {
-      message: status === 500 ? 'Internal Server Error' : err.message,
-      // error: err   // ← uncomment only in development
+  /* Public: errorHandler is a middleware that handles your errors */
+  helpers.errorHandler = function(err, req, res, next) {
+    var ret = {
+      message: err.message,
+      error:   err
     };
-
-    res.status(status).json(response);
-  };
-
-  // Normal middleware → 3 parameters
-  helpers.sessionMiddleware = function (req, res, next) {
-    if (!req.cookies.logged_in) {
-      req.session.customerId = null;
+    if (!res.headersSent) {
+      res.status(err.status || 500).send(ret);
     }
-    next(); // Don't forget this!
   };
 
-  helpers.respondSuccessBody = function (res, body) {
+  // Fixed: removed 'err' param (was making Express treat this as error handler)
+  // Fixed: changed res.session to req.session
+  // Fixed: added next() so request continues
+  helpers.sessionMiddleware = function(req, res, next) {
+    if(!req.cookies.logged_in) {
+      if (req.session) {
+        req.session.customerId = null;
+      }
+    }
+    next();
+  };
+
+  /* Responds with the given body and status 200 OK  */
+  helpers.respondSuccessBody = function(res, body) {
     helpers.respondStatusBody(res, 200, body);
-  };
+  }
 
-  helpers.respondStatusBody = function (res, statusCode, body) {
+  /* Public: responds with the given body and status */
+  helpers.respondStatusBody = function(res, statusCode, body) {
+    if (res.headersSent) return;
     res.writeHead(statusCode);
-    res.write(body);
-    res.end();
-  };
-
-  helpers.respondStatus = function (res, statusCode) {
-    res.writeHead(statusCode);
-    res.end();
-  };
-
-  helpers.rewriteSlash = function (req, res, next) {
-    if (req.url.substr(-1) === '/' && req.url.length > 1) {
-      res.redirect(301, req.url.slice(0, -1));
+    if (typeof body === 'object') {
+      res.write(JSON.stringify(body));
     } else {
-      next();
+      res.write(body);
     }
-  };
+    res.end();
+  }
 
-  helpers.simpleHttpRequest = function (url, res, next) {
-    axios
-      .get(url)
-      .then(function (response) {
+  /* Responds with the given statusCode */
+  helpers.respondStatus = function(res, statusCode) {
+    if (res.headersSent) return;
+    res.writeHead(statusCode);
+    res.end();
+  }
+
+  /* Rewrites and redirects any url that doesn't end with a slash. */
+  helpers.rewriteSlash = function(req, res, next) {
+   if(req.url.substr(-1) == '/' && req.url.length > 1)
+       res.redirect(301, req.url.slice(0, -1));
+   else
+       next();
+  }
+
+  /* Public: performs an HTTP GET request to the given URL */
+  helpers.simpleHttpRequest = function(url, res, next) {
+    axios.get(url)
+      .then(function(response) {
         helpers.respondSuccessBody(res, response.data);
       })
-      .catch(function (error) {
-        next(error); // pass to error handler
+      .catch(function(error) {
+        return next(error);
       });
-  };
+  }
 
-  helpers.getCustomerId = function (req, env) {
-    const logged_in = req.cookies.logged_in;
+  /* TODO: Add documentation */
+  helpers.getCustomerId = function(req, env) {
+    var logged_in = req.cookies.logged_in;
 
-    // TODO REMOVE THIS, SECURITY RISK
-    if (env === "development" && req.query.custId != null) {
+    if (env == "development" && req.query.custId != null) {
       return req.query.custId;
     }
 
@@ -74,7 +86,6 @@
     }
 
     return req.session.customerId;
-  };
-
+  }
   module.exports = helpers;
-})();
+}());
