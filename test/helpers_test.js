@@ -270,10 +270,20 @@
       });
 
       describe("calling next()", function() {
-        it("calls next() to continue to the next middleware", function(done) {
+        it("calls next() to continue to the next middleware", function() {
+          var req = { cookies: {}, session: {} };
+          var res = {};
+          var nextSpy = sinon.spy();
+          
+          helpers.sessionMiddleware(req, res, nextSpy);
+          
+          expect(nextSpy.calledOnce).to.equal(true);
+        });
+        
+        it("allows the request to reach subsequent middleware", function(done) {
           var cookieParser = require("cookie-parser");
           var session = require("express-session");
-          var nextCalled = false;
+          var nextMiddlewareReached = false;
           
           app.use(cookieParser());
           app.use(session({
@@ -285,14 +295,14 @@
           app.use(helpers.sessionMiddleware);
           
           app.use(function(req, res) {
-            nextCalled = true;
+            nextMiddlewareReached = true;
             res.status(200).json({ success: true });
           });
 
           chai.request(app)
             .get("/")
             .end(function(err, res) {
-              expect(nextCalled).to.equal(true);
+              expect(nextMiddlewareReached).to.equal(true);
               expect(res).to.have.status(200);
               done();
             });
