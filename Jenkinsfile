@@ -1,41 +1,27 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKERHUB_REPO = 'mohamedadel9988/frontend'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-    }
-
-    tools {
-        nodejs 'NodeJS'  // Configure in Manage Jenkins → Tools → NodeJS
-    }
-
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo "✅ Code checked out successfully"
+                echo '✅ Code checked out'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install & Test') {
             steps {
-                sh 'npm install'
-                echo "✅ Dependencies installed"
-            }
-        }
-
-        stage('Test') {
-            steps {
-                sh 'npm test || true'
-                echo "✅ Tests completed"
+                sh '''
+                    docker run --rm -v "$PWD":/app -w /app node:20-alpine sh -c "npm install && npm test || true"
+                '''
+                echo '✅ Install & Test completed'
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh "docker build -t ${DOCKERHUB_REPO}:${IMAGE_TAG} -t ${DOCKERHUB_REPO}:latest ."
-                echo "✅ Docker image built: ${DOCKERHUB_REPO}:${IMAGE_TAG}"
+                sh 'docker build -t mohamedadel9988/frontend:latest -t mohamedadel9988/frontend:${BUILD_NUMBER} .'
+                echo '✅ Docker image built'
             }
         }
 
@@ -48,16 +34,16 @@ pipeline {
                 )]) {
                     sh '''
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        docker push ${DOCKERHUB_REPO}:${IMAGE_TAG}
-                        docker push ${DOCKERHUB_REPO}:latest
+                        docker push mohamedadel9988/frontend:latest
+                        docker push mohamedadel9988/frontend:${BUILD_NUMBER}
                         docker logout
                     '''
                 }
-                echo "✅ Image pushed to Docker Hub"
+                echo '✅ Pushed to Docker Hub'
             }
         }
 
-        stage('Update K8s Manifest for ArgoCD') {
+        stage('Update K8s Manifest') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'github-credentials',
@@ -68,36 +54,30 @@ pipeline {
                         rm -rf mogambo-manifests
                         git clone https://${GIT_USER}:${GIT_PASS}@github.com/smellawy/mogambo-manifests.git
                         cd mogambo-manifests
-                        sed -i "s|image: mohamedadel9988/frontend:.*|image: mohamedadel9988/frontend:${IMAGE_TAG}|g" apps/frontend/deployment.yml
+                        sed -i "s|image: mohamedadel9988/frontend:.*|image: mohamedadel9988/frontend:${BUILD_NUMBER}|g" apps/frontend/deployment.yml
                         git config user.email "jenkins@mogambo.com"
                         git config user.name "Jenkins CI"
                         git add .
-                        git commit -m "🚀 Update frontend image to build ${IMAGE_TAG}"
-                        git push origin main
+                        git commit -m "Update frontend image to build ${BUILD_NUMBER}" || true
+                        git push origin main || true
                     '''
                 }
-                echo "✅ ArgoCD manifest updated"
+                echo '✅ ArgoCD manifest updated'
             }
         }
 
         stage('Cleanup') {
             steps {
                 sh '''
-                    docker rmi ${DOCKERHUB_REPO}:${IMAGE_TAG} || true
-                    docker rmi ${DOCKERHUB_REPO}:latest || true
+                    docker rmi mohamedadel9988/frontend:${BUILD_NUMBER} || true
                     rm -rf mogambo-manifests
                 '''
-                echo "✅ Cleanup done"
             }
         }
     }
 
     post {
-        success {
-            echo "🎉 Frontend pipeline completed successfully! Build #${BUILD_NUMBER}"
-        }
-        failure {
-            echo "❌ Frontend pipeline failed at build #${BUILD_NUMBER}"
-        }
+        success { echo '🎉 Frontend Pipeline SUCCESS! Build #${BUILD_NUMBER}' }
+        failure { echo '❌ Frontend Pipeline FAILED! Build #${BUILD_NUMBER}' }
     }
 }
