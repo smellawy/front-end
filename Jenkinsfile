@@ -20,7 +20,7 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t mohamedadel9988/frontend:latest -t mohamedadel9988/frontend:${BUILD_NUMBER} .'
+                sh 'docker build -t mohamedadel9988/frontend:latest -t mohamedadel9988/frontend:latest .'
                 echo '✅ Docker image built'
             }
         }
