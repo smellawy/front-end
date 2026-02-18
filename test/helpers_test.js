@@ -202,6 +202,114 @@
       });
     });
 
+    describe("#sessionMiddleware", function() {
+      it("has exactly 3 parameters (req, res, next)", function() {
+        expect(helpers.sessionMiddleware.length).to.equal(3);
+      });
+
+      describe("when user is not logged in", function() {
+        it("sets req.session.customerId to null", function(done) {
+          var cookieParser = require("cookie-parser");
+          var session = require("express-session");
+          
+          app.use(cookieParser());
+          app.use(session({
+            secret: 'test-secret',
+            resave: false,
+            saveUninitialized: true
+          }));
+          
+          app.use(helpers.sessionMiddleware);
+          
+          app.use(function(req, res) {
+            expect(req.session.customerId).to.equal(null);
+            res.status(200).json({ success: true });
+          });
+
+          chai.request(app)
+            .get("/")
+            .end(function(err, res) {
+              expect(res).to.have.status(200);
+              done();
+            });
+        });
+      });
+
+      describe("when user is logged in", function() {
+        it("does not modify req.session.customerId", function(done) {
+          var cookieParser = require("cookie-parser");
+          var session = require("express-session");
+          
+          app.use(cookieParser());
+          app.use(session({
+            secret: 'test-secret',
+            resave: false,
+            saveUninitialized: true
+          }));
+          
+          app.use(function(req, res, next) {
+            req.session.customerId = "existing-customer-id";
+            next();
+          });
+          
+          app.use(helpers.sessionMiddleware);
+          
+          app.use(function(req, res) {
+            expect(req.session.customerId).to.equal("existing-customer-id");
+            res.status(200).json({ success: true });
+          });
+
+          chai.request(app)
+            .get("/")
+            .set('Cookie', 'logged_in=true')
+            .end(function(err, res) {
+              expect(res).to.have.status(200);
+              done();
+            });
+        });
+      });
+
+      describe("calling next()", function() {
+        it("calls next() to continue to the next middleware", function() {
+          var req = { cookies: {}, session: {} };
+          var res = {};
+          var nextSpy = sinon.spy();
+          
+          helpers.sessionMiddleware(req, res, nextSpy);
+          
+          expect(nextSpy.calledOnce).to.equal(true);
+        });
+        
+        it("allows the request to reach subsequent middleware", function(done) {
+          var cookieParser = require("cookie-parser");
+          var session = require("express-session");
+          var nextMiddlewareReached = false;
+          
+          app.use(cookieParser());
+          app.use(session({
+            secret: 'test-secret',
+            resave: false,
+            saveUninitialized: true
+          }));
+          
+          app.use(helpers.sessionMiddleware);
+          
+          app.use(function(req, res) {
+            nextMiddlewareReached = true;
+            res.status(200).json({ success: true });
+          });
+
+          chai.request(app)
+            .get("/")
+            .end(function(err, res) {
+              expect(nextMiddlewareReached).to.equal(true);
+              expect(res).to.have.status(200);
+              done();
+            });
+        });
+      });
+    });
+
     describe("#getCustomerId", function() {
       describe("given the environment is development", function() {
         it("returns the customer id from the query string", function() {
